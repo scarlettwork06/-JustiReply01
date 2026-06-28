@@ -1,1 +1,306 @@
 judicial-petition-responder
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人民陳情案「簽、函稿」自動生成器</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #1a365d;
+            border-bottom: 2px solid #2b6cb0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+        input[type="text"], input[type="date"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        textarea {
+            resize: vertical;
+            height: 100px;
+        }
+        .required::after {
+            content: " *";
+            color: #e53e3e;
+        }
+        .btn-group {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-sign-draft {
+            background-color: #2b6cb0;
+        }
+        .btn-sign-draft:hover {
+            background-color: #2c5282;
+        }
+        .btn-replace {
+            background-color: #319795;
+        }
+        .btn-replace:hover {
+            background-color: #234e52;
+        }
+        .output-section {
+            margin-top: 30px;
+            display: none;
+        }
+        .document-box {
+            background: #fff;
+            border: 2px solid #333;
+            padding: 40px;
+            margin-bottom: 30px;
+            font-family: "標楷體", "DFKai-SB", serif;
+            font-size: 18px;
+            line-height: 1.8;
+            position: relative;
+            white-space: pre-wrap;
+        }
+        .doc-title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin-bottom: 30px;
+        }
+        .ai-badge {
+            background-color: #ebf8ff;
+            color: #2b6cb0;
+            border: 1px solid #bee3f8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>人民陳情案「簽、函稿」生成器</h2>
+    
+    <!-- 1. 陳情人 -->
+    <div class="form-group">
+        <label for="petitioner">陳情人 <span style="font-weight:normal; color:#718096;">(選填，留空則顯示「某民眾」)</span></label>
+        <input type="text" id="petitioner" placeholder="請輸入陳情人姓名或名稱">
+    </div>
+
+    <!-- 2. 來文時間 -->
+    <div class="form-group">
+        <label for="incomingDate">來文時間</label>
+        <input type="date" id="incomingDate">
+    </div>
+
+    <!-- 3. 陳情內容與回覆大要 -->
+    <div class="form-group">
+        <label for="content" class="required">陳情內容</label>
+        <textarea id="content" placeholder="請輸入陳情人訴求、痛點或主要陳情內容..."></textarea>
+    </div>
+
+        <div class="form-group">
+        <label for="summary">回覆大要 <span style="font-weight:normal; color:#718096;">(選填，由 Gemini AI 自動優化/擬稿)</span></label>
+        <textarea id="summary" placeholder="留空：由 AI 依陳情內容從無到有生成。&#10;簡要填寫：例如輸入「不符規定拒絕」，由 AI 自動潤飾擴充。"></textarea>
+    </div>
+
+    <div style="margin-top: -10px; margin-bottom: 25px; font-size: 13px; color: #718096; display: flex; gap: 15px;">
+        <span>🔍 系統已內嵌：<a href="https://law.moj.gov.tw/" target="_blank" style="color: #2b6cb0; text-decoration: none; font-weight: bold;">全國法規資料庫</a> 檢索提示</span>
+        <span>📘 遵照：<a href="https://www.ey.gov.tw/" target="_blank" style="color: #2b6cb0; text-decoration: none; font-weight: bold;">行政院文書處理手冊</a> 擬稿標準（簡淺明確/客觀委婉）</span>
+    </div>
+
+
+    <!-- 4. 決行方式按鍵 -->
+    <div class="btn-group">
+        <button class="btn-sign-draft" onclick="generateDoc('併陳')">📝 簽稿併陳</button>
+        <button class="btn-replace" onclick="generateDoc('代簽')">🚀 以稿代簽</button>
+    </div>
+
+    <!-- 輸出區塊 -->
+    <div id="outputSection" class="output-section">
+        <div id="aiNotify" class="ai-badge"></div>
+        <div id="documentContainer"></div>
+    </div>
+</div>
+
+<script>
+    // 網頁開啟時自動填入今天日期（2026年6月28日邏輯）
+    window.onload = function() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        document.getElementById('incomingDate').value = `${yyyy}-${mm}-${dd}`;
+    };
+
+    // 格式化日期為公文用的民國日期
+    function formatChineseDate(dateString) {
+        if (!dateString) {
+            return "____年__月__日";
+        }
+        const date = new Date(dateString);
+        const rocYear = date.getFullYear() - 1911;
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `中華民國 ${rocYear} 年 ${month} 月 ${day} 日`;
+    }
+
+            // 真正串接 Google Gemini API 的處理邏輯
+    async function simulateGeminiAI(content, summary) {
+        const API_KEY = "AQ.Ab8RN6JSB7tEjwu2gNMyqDIUqNGWn0XVomSkjF95Ck_UBS1aZQ"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+        const trimmedSummary = summary.trim();
+        const trimmedContent = content.trim();
+
+        // 建立給 Gemini 的公務擬稿指令 (Prompt)
+        let prompt = `你是一位精通台灣政府機關公文擬稿的資深主辦。請參酌《行政院文書處理手冊》規範（文字須簡淺明確、語氣客觀委婉、依法行政）與《全國法規資料庫》引用格式，針對以下陳情案件，擬定一段專業的「復函大要」（不需寫主旨、受文者，直接條列說明段內容即可）。\n\n`;
+        prompt += `【民眾陳情內容】：${trimmedContent}\n`;
+
+        if (!trimmedSummary) {
+            prompt += `【回覆指導原則】：目前留空，請完全「從無到有」幫我生出一段符合法規研析、委婉拒絕或依法辦理的專業標準公文大要。`;
+        } else {
+            prompt += `【擬答關鍵字/核心重點】：${trimmedSummary}\n`;
+            prompt += `【回覆指導原則】：請務必包含上述關鍵字重點，將其「潤飾、擴充」成具備行政厚度、客觀委婉的公務標準公文文字。`;
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            const aiText = data.candidates[0].content.parts[0].text;
+            
+            return {
+                text: aiText,
+                status: trimmedSummary ? `✍️ <b>【Gemini AI 深度潤飾成功】</b>已依據您的重點與手冊規範完成擴充。` : `✨ <b>【Gemini AI 智能生成成功】</b>已由無到有為您擬定完整公文。`
+            };
+
+        } catch (error) {
+            console.error("API 請求失敗:", error);
+            return {
+                text: `（因金鑰尚未生效或設定錯誤，切換回模擬文字）：\n一、關於您陳情反映「${trimmedContent.substring(0,20)}...」事項，本機關刻正依法辦理中。\n二、本案（${trimmedSummary || '研議中'}），將秉持客觀委婉原則續辦。`,
+                status: `⚠️ <b>【提示】</b>目前正使用離線模擬。若要啟用真正的 Gemini AI，請在程式碼中填入您的 AIzaSy 金鑰。`
+            };
+        }
+    }
+    
+
+    
+
+    // 主生成程式
+        async function generateDoc(type) {
+        const petitioner = document.getElementById('petitioner').value.trim() || "某民眾";
+        const incomingDateStr = document.getElementById('incomingDate').value;
+        const content = document.getElementById('content').value.trim();
+        const summaryInput = document.getElementById('summary').value;
+
+        if (!content) {
+            alert("請填寫「陳情內容」後再行生成！");
+            return;
+        }
+
+        const formattedDate = formatChineseDate(incomingDateStr);
+        
+        // 呼叫 AI 模擬器
+        const aiResult = await simulateGeminiAI(content, summaryInput);
+        
+        // 顯示 AI 處理狀態提示
+        const aiNotify = document.getElementById('aiNotify');
+        aiNotify.innerHTML = aiResult.status;
+
+        const container = document.getElementById('documentContainer');
+        container.innerHTML = ""; // 清空舊資料
+
+        // 結構化文字定義
+        let signHtml = `
+<div class="document-box">
+<div class="doc-title">簽</div>
+<b>主旨：</b>有關${petitioner}於${formattedDate}反映「${content.substring(0,20)}...」陳情案，擬具復函如附件，提請 鑒核。
+
+<b>說明：</b>
+一、依據 ${formattedDate} 移文及陳情人陳情內容辦理。
+二、本案核心訴求為：「${content}」。
+三、本案管轄及法規研析：
+    ${aiResult.text}
+
+<b>擬辦：</b>
+一、本案文稿擬經奉核後，即行文復知陳情人。
+二、文存查。
+</div>`;
+
+        let draftHtml = `
+<div class="document-box">
+<div class="doc-title">（機關全銜） 函稿</div>
+發文日期：${formattedDate}
+發文字號：
+
+受文者：${petitioner}
+
+<b>主旨：</b>關於您反映之陳情事項，本機關復如說明，請 查照。
+
+<b>說明：</b>
+一、依據您${formattedDate}之陳情意見辦理。
+二、復文大要：
+    ${aiResult.text}
+三、感謝您對公共事務的關心，如對本案仍有法規適用之疑義，歡迎逕洽本機關承辦人。
+</div>`;
+
+        // 根據使用者按鍵，組合不同的顯示畫面
+        if (type === '併陳') {
+            container.innerHTML = `<h3 style="color:#2b6cb0;">【簽稿併陳模式】</h3>` + signHtml + draftHtml;
+        } else if (type === '代簽') {
+            container.innerHTML = `<h3 style="color:#319795;">【以稿代簽模式】</h3>` + draftHtml;
+        }
+
+        // 秀出結果區塊並滾動到該處
+        document.getElementById('outputSection').style.display = 'block';
+        window.scrollTo({ top: document.getElementById('outputSection').offsetTop, behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
