@@ -134,6 +134,17 @@ judicial-petition-responder
     <!-- 3. 陳情內容與回覆大要 -->
     <div class="form-group">
         <label for="content" class="required">陳情內容</label>
+     <div style="margin-bottom: 10px; padding: 10px; background: #edf2f7; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
+    <span style="font-size: 14px; font-weight: bold; color: #4a5568;">⚡ 快速帶入範本（可複選）：</span>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" id="chkJudge" value="民眾反映法官開庭態度不佳、言詞生硬，損及當事人權益。" onchange="applyTemplate()"> 1. 法官開庭態度 (直接帶入)
+        </label>
+        <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" id="chkClerk" value="民眾反映書記官於 ＿＿ 年 ＿＿ 月 ＿＿ 日開庭或通話時態度不佳（具體時間與訴求： ）。" onchange="applyTemplate()"> 2. 書記官態度 (需再填資料)
+        </label>
+    </div>
+</div>
         <textarea id="content" placeholder="請輸入陳情人訴求、痛點或主要陳情內容..."></textarea>
     </div>
 
@@ -170,6 +181,27 @@ judicial-petition-responder
         const dd = String(today.getDate()).padStart(2, '0');
         document.getElementById('incomingDate').value = `${yyyy}-${mm}-${dd}`;
     };
+// 新增：處理勾選方塊同步到陳情內容的邏輯
+function applyTemplate() {
+    const contentTextarea = document.getElementById('content');
+    const chkJudge = document.getElementById('chkJudge');
+    const chkClerk = document.getElementById('chkClerk');
+    
+    let resultTexts = [];
+    
+    // 1. 法官開庭態度（勾選後不用再輸入資料）
+    if (chkJudge.checked) {
+        resultTexts.push(chkJudge.value);
+    }
+    
+    // 2. 書記官態度（勾選後預留空白給使用者再填入資料）
+    if (chkClerk.checked) {
+        resultTexts.push(chkClerk.value);
+    }
+    
+    // 將勾選的項目用換行結合，直接填入陳情內容欄位中
+    contentTextarea.value = resultTexts.join('\n');
+}
 
     // 格式化日期為公文用的民國日期
     function formatChineseDate(dateString) {
